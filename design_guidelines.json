@@ -1,0 +1,131 @@
+{
+  "theme": "light",
+  "design_philosophy": "High-Contrast Premium Sports UI. A departure from the dark navy/purple clones. We are building a 'Day-Night Test Match' / 'Premium Turf' vibe. It should feel like an elite, high-stakes sports trading floor, focusing on extreme data clarity, trust (emerald green), and kinetic energy (blaze orange).",
+  "typography": {
+    "headings": {
+      "family": "Outfit",
+      "weights": ["600", "700", "800"],
+      "usage": "Use for all page titles, contest titles, and large metric numbers. Keep tracking tight (`tracking-tight`).",
+      "h1": "text-4xl sm:text-5xl font-extrabold tracking-tighter text-zinc-950",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight text-zinc-950",
+      "h3": "text-xl sm:text-2xl font-bold text-zinc-900",
+      "data_metrics": "font-mono tabular-nums tracking-tighter"
+    },
+    "body": {
+      "family": "Manrope",
+      "weights": ["400", "500", "600"],
+      "usage": "Use for all body copy, forms, table data, and descriptions.",
+      "base": "text-base text-zinc-700 leading-relaxed",
+      "small": "text-sm text-zinc-500",
+      "label": "text-xs font-bold uppercase tracking-[0.1em] text-zinc-500"
+    }
+  },
+  "colors": {
+    "background": {
+      "app": "#F4F5F5",
+      "surface": "#FFFFFF",
+      "overlay": "rgba(9, 9, 11, 0.4)"
+    },
+    "primary": {
+      "DEFAULT": "#059669",
+      "hover": "#047857",
+      "foreground": "#FFFFFF",
+      "description": "Emerald Green. Used for primary CTAs (Join, Pay, Deposit) to signal trust and money."
+    },
+    "secondary": {
+      "DEFAULT": "#EA580C",
+      "hover": "#C2410C",
+      "foreground": "#FFFFFF",
+      "description": "Blaze Orange. Used for kinetic actions, alerts, live status, and withdrawal highlights."
+    },
+    "neutral": {
+      "950": "#09090B",
+      "900": "#18181B",
+      "700": "#3F3F46",
+      "500": "#71717A",
+      "200": "#E4E4E7",
+      "100": "#F4F4F5",
+      "50": "#FAFAFA"
+    },
+    "status": {
+      "success": "#10B981",
+      "warning": "#EAB308",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "layouts": {
+    "user_dashboard": {
+      "structure": "Top navigation bar (white surface, 1px border bottom) + Bento grid main content area.",
+      "grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+      "spacing": "Use p-6 or p-8 for main containers. Generous breathing room."
+    },
+    "admin_dashboard": {
+      "structure": "Collapsible left sidebar + main content area. High density data tables.",
+      "grid": "grid-cols-1 xl:grid-cols-4 gap-6",
+      "spacing": "Tight padding (p-4 to p-6) to maximize data visibility."
+    },
+    "cards": {
+      "style": "Flat solid surfaces. `bg-white border border-zinc-200 rounded-lg`. NO drop shadows to maintain a sharp, technical look.",
+      "interaction": "`hover:border-zinc-300 hover:-translate-y-1 transition-all duration-200`"
+    }
+  },
+  "components": {
+    "buttons": "Pill-shaped (`rounded-full`) or slightly rounded (`rounded-md`) but keep it consistent. Use sharp `font-bold` text. Primary buttons must use Emerald Green.",
+    "inputs": "Shadcn default `Input` and `Select`, customized with `focus:ring-emerald-500` and `border-zinc-200`.",
+    "badges": "Use solid light backgrounds with dark text for status. e.g. Pending = `bg-yellow-100 text-yellow-800 font-semibold px-2 py-1 rounded`.",
+    "modals": "Shadcn `Dialog`. Use for UPI screenshot upload and Withdrawal requests. Ensure a clean file upload zone with dashed borders (`border-dashed border-2 border-zinc-300`).",
+    "tabs": "Shadcn `Tabs`. Customize the active state to have a bold bottom border (`border-b-2 border-emerald-600`) or a solid pill background, avoiding generic grey.",
+    "tables": "Admin panel tables must use Shadcn `Table`. Include subtle alternating row colors (`even:bg-zinc-50`) or solid lines (`border-b border-zinc-100`) for readability."
+  },
+  "visual_enhancers": {
+    "borders": "Expose the skeleton. Use 1px `zinc-200` borders aggressively to separate sections instead of using different background shades or shadows.",
+    "icons": "Use `@phosphor-icons/react` (Duotone weight for marketing/empty states, Regular for dense data/admin).",
+    "micro_interactions": "Add `group-hover:text-emerald-600` on card titles when hovering the parent card. Add `active:scale-95` on all primary buttons."
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.pexels.com/photos/36741131/pexels-photo-36741131.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Vibrant cricket match at Narendra Modi Stadium with a packed crowd.",
+        "usage": "Landing page hero background. Apply `bg-black/60` overlay for text contrast."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1593341646782-e0b495cff86d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxjcmlja2V0JTIwYmF0c21hbiUyMGFjdGlvbnxlbnwwfHx8fDE3OTAxMDM2NTZ8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Cricket batsman hitting a ball.",
+        "usage": "User dashboard promo banner or empty state illustration."
+      },
+      {
+        "url": "https://images.pexels.com/photos/36728008/pexels-photo-36728008.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Gold trophies and green-yellow medals.",
+        "usage": "Winners announcement section or leaderboard header."
+      }
+    ]
+  },
+  "accessibility": {
+    "contrast": "Ensure all text over images uses proper overlays. Standard text must meet 4.5:1 ratio against background.",
+    "focus": "All interactive elements must have `focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none`.",
+    "data_testid": "MANDATORY. Add `data-testid` to all forms, buttons, links, and status badges."
+  },
+  "instructions_to_main_agent": [
+    "Build a React (Vite) + Tailwind + Shadcn application.",
+    "Do NOT use 'Inter' or 'Roboto' for headings. Use 'Outfit' for headings and 'Manrope' for body copy.",
+    "Do NOT use dark purple/violet gradients. Stick to the crisp white, zinc, emerald green, and blaze orange palette.",
+    "Create a clean User Dashboard with tabs (Contests, My Entries, Wallet).",
+    "Create a separate Admin Dashboard layout with a sidebar (Users, Contests, Payments, Withdrawals).",
+    "For the UPI Payment flow: Users click 'Join' -> Modal opens showing Admin UPI ID -> User uploads screenshot -> Status changes to Pending -> Admin approves -> External Link becomes visible to user.",
+    "Use Phosphor Icons via `yarn add @phosphor-icons/react`.",
+    "Ensure the hero section on the landing page uses the provided stadium image with a proper dark overlay so the white text pops.",
+    "Never use completely transparent backgrounds for headers/navbars if content scrolls under them. Use `bg-white/90 backdrop-blur-md border-b`."
+  ],
+  "universal_guidelines_for_main_agent": [
+    "Don't make generic centered layouts. Left-align dense content.",
+    "Use 2-3x more spacing than feels comfortable (e.g., p-6 or p-8 for cards).",
+    "Apply transition states ONLY to interactive elements (`transition-colors`, `transition-transform`), NOT universal `transition-all` on everything.",
+    "Use modern button styles (sharp or pill) with interaction animations.",
+    "Never use AI assistant emoji characters (🤖🧠💡) as icons. Use the Phosphor icon library.",
+    "Ensure all components use the requested `data-testid` for testing.",
+    "Toasts must be implemented using `sonner`.",
+    "Always add `data-testid` attributes to interactive and key informational elements."
+  ]
+}
