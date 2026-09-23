@@ -338,6 +338,13 @@ async def create_entry(
         raise HTTPException(status_code=404, detail="Contest not found")
     if contest.get("status") != "open":
         raise HTTPException(status_code=400, detail="Contest not open")
+    mt = contest.get("match_time")
+    if mt:
+        try:
+            if datetime.fromisoformat(mt.replace("Z", "+00:00")) <= datetime.now(timezone.utc):
+                raise HTTPException(status_code=400, detail="Entries closed: match already started")
+        except ValueError:
+            pass
     # One entry per user per contest (unless previously rejected)
     existing = await db.entries.find_one(
         {"contest_id": contest_id, "user_id": user["id"], "status": {"$in": ["pending", "approved"]}}

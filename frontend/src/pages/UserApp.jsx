@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
-import { Baseball as CricketBall, SignOut, Wallet, Trophy, Ticket, Clock, ArrowSquareOut, UploadSimple, CurrencyInr, Copy, DeviceMobile } from "@phosphor-icons/react";
+import { Baseball as CricketBall, SignOut, Wallet, Trophy, Ticket, Clock, ArrowSquareOut, UploadSimple, CurrencyInr, Copy, DeviceMobile, WhatsappLogo } from "@phosphor-icons/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
@@ -214,8 +214,25 @@ export default function UserApp() {
   );
 }
 
+function useCountdown(iso) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  if (!iso) return null;
+  const diff = new Date(iso).getTime() - now;
+  if (isNaN(diff)) return null;
+  if (diff <= 0) return { over: true, text: "Match started" };
+  const d = Math.floor(diff / 86400000), h = Math.floor((diff % 86400000) / 3600000), m = Math.floor((diff % 3600000) / 60000), s = Math.floor((diff % 60000) / 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  return { over: false, urgent: diff < 3600000, text: d > 0 ? `${d}d ${pad(h)}h ${pad(m)}m` : `${pad(h)}:${pad(m)}:${pad(s)}` };
+}
+
 function ContestCard({ contest, onJoin }) {
-  const closed = contest.status !== "open";
+  const cd = useCountdown(contest.match_time);
+  const closed = contest.status !== "open" || (cd && cd.over);
+  const share = () => {
+    const text = `🏏 Join "${contest.title}" on PitchPlay!\nEntry ₹${contest.entry_fee} · Prize pool ₹${contest.prize_pool}\n${window.location.origin}/?contest=${contest.id}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  };
   return (
     <div className="group bg-white border border-zinc-200 rounded-lg p-6 hover:border-emerald-400 hover:-translate-y-1 transition-all duration-200" data-testid={`contest-card-${contest.id}`}>
       <div className="flex items-start justify-between">
@@ -226,7 +243,15 @@ function ContestCard({ contest, onJoin }) {
           </h3>
           {contest.description && <p className="text-sm text-zinc-500 mt-1 line-clamp-2">{contest.description}</p>}
         </div>
+        <button type="button" onClick={share} className="p-2 rounded-full text-emerald-700 hover:bg-emerald-50" title="Share on WhatsApp" data-testid={`share-btn-${contest.id}`}>
+          <WhatsappLogo size={22} weight="fill" />
+        </button>
       </div>
+      {cd && (
+        <div className={`mt-4 flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold tabular ${cd.over ? "bg-zinc-100 text-zinc-600" : cd.urgent ? "bg-red-50 text-red-700 border border-red-200" : "bg-orange-50 text-orange-800 border border-orange-100"}`} data-testid={`countdown-${contest.id}`}>
+          <Clock size={16} weight="bold" /> {cd.over ? cd.text : `Entries close in ${cd.text}`}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 mt-5">
         <div className="bg-zinc-50 border border-zinc-100 rounded p-3">
           <div className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Entry fee</div>

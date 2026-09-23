@@ -13,6 +13,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
 const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
+const toLocalInput = (iso) => { const d = new Date(iso); const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
 
 const StatusBadge = ({ status }) => {
   const map = {
@@ -132,7 +133,7 @@ function ContestsPanel() {
 
   const openEdit = (c) => {
     setEditing(c);
-    setForm({ title: c.title, description: c.description || "", external_link: c.external_link || "", entry_fee: String(c.entry_fee), prize_pool: String(c.prize_pool), max_participants: String(c.max_participants), match_time: c.match_time || "" });
+    setForm({ title: c.title, description: c.description || "", external_link: c.external_link || "", entry_fee: String(c.entry_fee), prize_pool: String(c.prize_pool), max_participants: String(c.max_participants), match_time: c.match_time ? toLocalInput(c.match_time) : "" });
     setOpen(true);
   };
 
@@ -144,7 +145,7 @@ function ContestsPanel() {
       entry_fee: parseFloat(form.entry_fee || "0"),
       prize_pool: parseFloat(form.prize_pool || "0"),
       max_participants: parseInt(form.max_participants || "100"),
-      match_time: form.match_time || null,
+      match_time: form.match_time ? new Date(form.match_time).toISOString() : null,
     };
     try {
       if (editing) { await api.patch(`/contests/${editing.id}`, payload); toast.success("Contest updated"); }
@@ -199,6 +200,7 @@ function ContestsPanel() {
                 <TableCell>
                   <div className="font-bold text-zinc-950">{c.title}</div>
                   <div className="text-xs text-zinc-500 truncate max-w-xs">{c.external_link}</div>
+                  {c.match_time && <div className="text-xs text-orange-700 font-semibold mt-0.5" data-testid={`admin-match-time-${c.id}`}>Match: {new Date(c.match_time).toLocaleString()}</div>}
                 </TableCell>
                 <TableCell className="tabular"><span className="font-bold">{money(c.entry_fee)}</span> / <span className="text-orange-700 font-bold">{money(c.prize_pool)}</span></TableCell>
                 <TableCell className="tabular">{c.participants_count}/{c.max_participants}</TableCell>
@@ -234,6 +236,7 @@ function ContestsPanel() {
               <Field label="Prize pool (₹)"><Input inputMode="decimal" value={form.prize_pool} onChange={(e) => setForm({ ...form, prize_pool: e.target.value })} data-testid="contest-prize-input" /></Field>
             </div>
             <Field label="Max participants"><Input inputMode="numeric" value={form.max_participants} onChange={(e) => setForm({ ...form, max_participants: e.target.value })} data-testid="contest-max-input" /></Field>
+            <Field label="Match time (entries close)"><Input type="datetime-local" value={form.match_time} onChange={(e) => setForm({ ...form, match_time: e.target.value })} data-testid="contest-time-input" /></Field>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
