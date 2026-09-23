@@ -267,6 +267,17 @@ function ContestCard({ contest, onJoin }) {
         <div className="text-xs text-zinc-500 tabular">
           {contest.participants_count}/{contest.max_participants} joined
         </div>
+        {contest.external_link ? (
+          <a href={contest.external_link} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-orange-600 hover:bg-orange-700 text-white font-bold px-4 py-2 active:scale-95 transition-transform"
+            data-testid={`card-play-link-${contest.id}`}>
+            <ArrowSquareOut size={16} weight="bold" /> Open contest
+          </a>
+        ) : contest.my_entry_status === "pending" ? (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-2" data-testid={`card-pending-${contest.id}`}>
+            <Clock size={14} weight="bold" /> Waiting for approval
+          </span>
+        ) : (
         <Button
           disabled={closed}
           onClick={onJoin}
@@ -275,6 +286,7 @@ function ContestCard({ contest, onJoin }) {
         >
           Join contest
         </Button>
+        )}
       </div>
     </div>
   );

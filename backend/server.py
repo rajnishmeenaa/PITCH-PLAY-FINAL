@@ -270,12 +270,14 @@ async def list_contests(user=Depends(get_current_user)):
     contests = await db.contests.find({}, {"_id": 0}).sort("created_at", -1).to_list(500)
     # For non-admin, hide external_link unless user has approved entry
     if user["role"] != "admin":
-        approved_entries = await db.entries.find(
-            {"user_id": user["id"], "status": "approved"}, {"_id": 0, "contest_id": 1}
+        my_entries = await db.entries.find(
+            {"user_id": user["id"], "status": {"$in": ["pending", "approved", "won"]}}, {"_id": 0, "contest_id": 1, "status": 1}
         ).to_list(500)
-        approved_ids = {e["contest_id"] for e in approved_entries}
+        status_by_contest = {e["contest_id"]: e["status"] for e in my_entries}
         for c in contests:
-            if c["id"] not in approved_ids:
+            st = status_by_contest.get(c["id"])
+            c["my_entry_status"] = st
+            if st not in ("approved", "won"):
                 c["external_link"] = None
     # Attach participant counts
     for c in contests:
@@ -393,7 +395,7 @@ async def my_entries(user=Depends(get_current_user)):
     items = await db.entries.find({"user_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
     # Attach external link if approved
     for it in items:
-        if it["status"] == "approved":
+        if it["status"] in ("approved", "won"):
             c = await db.contests.find_one({"id": it["contest_id"]}, {"_id": 0})
             it["external_link"] = c.get("external_link") if c else None
     return items
