@@ -35,6 +35,7 @@
 - [x] Testing agent iteration_1: all backend + frontend tests passed
 - [x] Contest editing (admin PATCH via dialog), search boxes in Users & Payments, user wallet history (GET /api/wallet/history), winners board (GET /api/winners) — iteration_2 all passed
 
+- [x] Admin can upload a custom UPI QR image (POST/DELETE /api/admin/payment-settings/qr); users see it in the Join dialog (falls back to auto QR). User's own QR uploaded.
 - [x] Match time on contests (admin datetime input, live countdown on cards, entries blocked after match start) + WhatsApp share button on cards — iteration_3 all passed
 
 ## Backlog

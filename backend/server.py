@@ -448,7 +448,7 @@ async def declare_winner(entry_id: str, body: DeclareWinnerBody, admin=Depends(r
 @api_router.get("/wallet/config")
 async def wallet_config(user=Depends(get_current_user)):
     s = await get_payment_settings()
-    return {"admin_upi_id": s["upi_id"], "payee_name": s.get("payee_name", ""), "instructions": s.get("instructions", "")}
+    return {"admin_upi_id": s["upi_id"], "payee_name": s.get("payee_name", ""), "instructions": s.get("instructions", ""), "qr_path": s.get("qr_path")}
 
 
 @api_router.get("/wallet/history")
@@ -480,7 +480,33 @@ async def admin_put_payment_settings(body: PaymentSettingsBody, admin=Depends(re
     doc = {"key": "payment", "upi_id": body.upi_id.strip(), "payee_name": body.payee_name.strip(),
            "instructions": body.instructions.strip(), "updated_at": now_iso()}
     await db.settings.update_one({"key": "payment"}, {"$set": doc}, upsert=True)
-    return doc
+    return await get_payment_settings()
+
+
+@api_router.post("/admin/payment-settings/qr")
+async def admin_upload_qr(qr: UploadFile = File(...), admin=Depends(require_admin)):
+    data = await qr.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="Empty file")
+    if len(data) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large (>5MB)")
+    ext = (qr.filename or "png").rsplit(".", 1)[-1].lower()
+    if ext not in {"png", "jpg", "jpeg", "webp"}:
+        ext = "png"
+    path = f"{APP_NAME}/qr/{uuid.uuid4()}.{ext}"
+    try:
+        result = put_object(path, data, qr.content_type or "image/png")
+    except Exception as e:
+        logger.exception("QR upload failed")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+    await db.settings.update_one({"key": "payment"}, {"$set": {"qr_path": result["path"], "updated_at": now_iso()}}, upsert=True)
+    return await get_payment_settings()
+
+
+@api_router.delete("/admin/payment-settings/qr")
+async def admin_remove_qr(admin=Depends(require_admin)):
+    await db.settings.update_one({"key": "payment"}, {"$unset": {"qr_path": ""}})
+    return await get_payment_settings()
 
 
 @api_router.post("/withdrawals")
@@ -639,7 +665,7 @@ async def serve_file(path: str = Query(...), user=Depends(get_current_user)):
     # Since entries store screenshot_path, allow if user is admin OR path startswith user id folder.
     if user["role"] != "admin":
         expected_prefix = f"{APP_NAME}/screenshots/{user['id']}/"
-        if not path.startswith(expected_prefix):
+        if not path.startswith(expected_prefix) and not path.startswith(f"{APP_NAME}/qr/"):
             raise HTTPException(status_code=403, detail="Forbidden")
     try:
         data, content_type = get_object(path)

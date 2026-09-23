@@ -8,7 +8,7 @@ import { Label } from "../components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Baseball as CricketBall, SignOut, Users, Ticket, Receipt, CurrencyInr, Plus, Trash, Check, X, Trophy, Eye, ChartBar, Gear, PencilSimple, MagnifyingGlass } from "@phosphor-icons/react";
+import { Baseball as CricketBall, SignOut, Users, Ticket, Receipt, CurrencyInr, Plus, Trash, Check, X, Trophy, Eye, ChartBar, Gear, PencilSimple, MagnifyingGlass, UploadSimple } from "@phosphor-icons/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
@@ -375,7 +375,7 @@ function EntriesPanel() {
   );
 }
 
-function ScreenshotViewer({ path }) {
+export function ScreenshotViewer({ path, testId = "screenshot-img", className = "w-full rounded-md border border-zinc-200" }) {
   const [url, setUrl] = useState(null);
   useEffect(() => {
     let objectUrl;
@@ -390,7 +390,7 @@ function ScreenshotViewer({ path }) {
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [path]);
   if (!url) return <div className="p-8 text-center text-zinc-500 text-sm">Loading...</div>;
-  return <img src={url} alt="Screenshot" className="w-full rounded-md border border-zinc-200" data-testid="screenshot-img" />;
+  return <img src={url} alt="QR / Screenshot" className={className} data-testid={testId} />;
 }
 
 function WithdrawalsPanel() {
@@ -583,16 +583,32 @@ function WalletDialog({ user, onClose, onDone }) {
 
 function PaymentSettingsPanel() {
   const [form, setForm] = useState({ upi_id: "", payee_name: "", instructions: "" });
-  useEffect(() => { api.get("/admin/payment-settings").then(r => setForm({ upi_id: r.data.upi_id || "", payee_name: r.data.payee_name || "", instructions: r.data.instructions || "" })); }, []);
+  const [qrPath, setQrPath] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const apply = (d) => { setForm({ upi_id: d.upi_id || "", payee_name: d.payee_name || "", instructions: d.instructions || "" }); setQrPath(d.qr_path || null); };
+  useEffect(() => { api.get("/admin/payment-settings").then(r => apply(r.data)); }, []);
   const save = async () => {
-    try { await api.put("/admin/payment-settings", form); toast.success("Payment settings saved"); }
+    try { const r = await api.put("/admin/payment-settings", form); apply(r.data); toast.success("Payment settings saved"); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  const uploadQr = async (file) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const fd = new FormData(); fd.append("qr", file);
+      const r = await api.post("/admin/payment-settings/qr", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      apply(r.data); toast.success("QR code updated");
+    } catch (e) { toast.error(e?.response?.data?.detail || "Upload failed"); } finally { setBusy(false); }
+  };
+  const removeQr = async () => {
+    try { const r = await api.delete("/admin/payment-settings/qr"); apply(r.data); toast.success("Custom QR removed"); }
     catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
   };
   const upiLink = `upi://pay?pa=${encodeURIComponent(form.upi_id)}&pn=${encodeURIComponent(form.payee_name || "Admin")}&cu=INR`;
   return (
     <div>
       <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-zinc-950">Payment settings</h1>
-      <p className="text-zinc-500 mt-1">Users pay entry fees to this UPI ID. A QR code is generated automatically.</p>
+      <p className="text-zinc-500 mt-1">Users pay entry fees to this UPI ID. Upload your own QR (PhonePe/GPay/Paytm) or we generate one.</p>
       <div className="grid lg:grid-cols-2 gap-6 mt-6">
         <div className="bg-white border border-zinc-200 rounded-lg p-6 grid gap-4">
           <Field label="UPI ID"><Input value={form.upi_id} onChange={(e) => setForm({ ...form, upi_id: e.target.value })} placeholder="yourname@upi" data-testid="settings-upi-input" /></Field>
@@ -601,9 +617,16 @@ function PaymentSettingsPanel() {
           <Button onClick={save} className="bg-emerald-600 hover:bg-emerald-700 font-bold w-fit" data-testid="settings-save-btn">Save settings</Button>
         </div>
         <div className="bg-white border border-zinc-200 rounded-lg p-6 flex flex-col items-center justify-center gap-3">
-          <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">QR preview</div>
-          {form.upi_id ? <QRCodeSVG value={upiLink} size={180} data-testid="settings-qr" /> : <div className="text-sm text-zinc-400">Enter UPI ID</div>}
+          <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">{qrPath ? "Your uploaded QR" : "Auto-generated QR"}</div>
+          {qrPath ? <ScreenshotViewer path={qrPath} testId="settings-qr-image" className="w-52 rounded-md border border-zinc-200" /> : form.upi_id ? <QRCodeSVG value={upiLink} size={180} data-testid="settings-qr" /> : <div className="text-sm text-zinc-400">Enter UPI ID</div>}
           <div className="font-heading font-extrabold text-emerald-800 tabular" data-testid="settings-upi-preview">{form.upi_id || "—"}</div>
+          <div className="flex gap-2 mt-2">
+            <label className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-4 py-2 rounded-md cursor-pointer" data-testid="upload-qr-label">
+              <UploadSimple size={16} weight="bold" /> {busy ? "Uploading..." : qrPath ? "Replace QR" : "Upload QR"}
+              <input type="file" accept="image/*" className="hidden" disabled={busy} onChange={(e) => uploadQr(e.target.files?.[0])} data-testid="upload-qr-input" />
+            </label>
+            {qrPath && <Button variant="outline" onClick={removeQr} data-testid="remove-qr-btn">Use auto QR</Button>}
+          </div>
         </div>
       </div>
     </div>

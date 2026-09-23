@@ -10,6 +10,7 @@ import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 import { Baseball as CricketBall, SignOut, Wallet, Trophy, Ticket, Clock, ArrowSquareOut, UploadSimple, CurrencyInr, Copy, DeviceMobile, WhatsappLogo } from "@phosphor-icons/react";
 import { QRCodeSVG } from "qrcode.react";
+import { ScreenshotViewer } from "./AdminApp";
 import { useNavigate } from "react-router-dom";
 
 const StatusBadge = ({ status }) => {
@@ -318,8 +319,8 @@ function JoinDialog({ contest, onClose, config, onDone }) {
           <DialogDescription>Pay <span className="font-bold text-emerald-700 tabular">{money(contest.entry_fee)}</span> to the admin UPI below, then upload the payment screenshot.</DialogDescription>
         </DialogHeader>
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex gap-4 items-center">
-          <div className="bg-white p-2 rounded-md border border-emerald-200 shrink-0">
-            <QRCodeSVG value={upiLink} size={110} data-testid="upi-qr" />
+          <div className="bg-white p-2 rounded-md border border-emerald-200 shrink-0 w-[126px]">
+            {config.qr_path ? <ScreenshotViewer path={config.qr_path} testId="upi-qr-image" className="w-full rounded" /> : <QRCodeSVG value={upiLink} size={110} data-testid="upi-qr" />}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-bold uppercase tracking-widest text-emerald-800">Pay to UPI ID</div>
