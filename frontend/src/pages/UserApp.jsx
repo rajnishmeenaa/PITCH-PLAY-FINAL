@@ -148,7 +148,7 @@ export default function UserApp() {
                         <div className="text-sm font-bold text-orange-700 mt-1 tabular">🏆 Prize: {money(e.winner_prize)}</div>
                       )}
                     </div>
-                    {e.status === "approved" && e.external_link && (
+                    {(e.status === "approved" || e.status === "won") && e.external_link && (
                       <a
                         href={e.external_link}
                         target="_blank"

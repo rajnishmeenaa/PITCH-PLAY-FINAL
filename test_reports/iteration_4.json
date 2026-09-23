@@ -1,0 +1,32 @@
+{
+  "summary": "Targeted bug-fix verification: contest link visibility to users based on entry status. Backend fully passes all scenarios (no entry, pending, approved, won, rejected re-join, admin). Frontend Contests tab correctly shows card-pending / card-play-link based on my_entry_status. However, the My Entries tab shows play-link ONLY for status=='approved' and MISSES it for status=='won', violating the task requirement 'won status keeps link and play-link in My Entries'.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "UserApp.jsx My Entries tab", "issue": "play-link-{id} button is not rendered for won entries. Current condition at line 151 is `e.status === 'approved' && e.external_link`; must be `(e.status === 'approved' || e.status === 'won') && e.external_link`. Backend already returns external_link for won entries but UI hides the button. Card on Contests tab works for both approved and won.", "selector": "[data-testid='play-link-<entry_id>']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_contest_link.py",
+    "/app/test_reports/pytest/iter4_contest_link.xml"
+  ],
+  "action_items": [
+    "Fix UserApp.jsx line ~151: change condition from `e.status === 'approved' && e.external_link` to `(e.status === 'approved' || e.status === 'won') && e.external_link` so play-link-{id} is rendered on My Entries for won entries too."
+  ],
+  "critical_code_review_comments": [
+    "Backend list_contests: for admin, my_entry_status is not attached but that is fine because admins can't join. external_link is always visible - correct.",
+    "list_contests filter uses status $in ['pending','approved','won'] - correct; rejected users can rejoin.",
+    "entries/mine attaches external_link only for approved/won - matches spec.",
+    "Small inconsistency: on Contests tab (ContestCard) the card shows the play-link whenever contest.external_link is truthy (i.e., approved OR won because backend returns link only for those), while My Entries tab explicitly gates on status. Consider unifying the check."
+  ],
+  "updated_files": ["/app/backend/tests/test_contest_link.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "83% (5/6 - won-in-my-entries missing)"},
+  "test_credentials": "Admin 9602341799/admin123; User 7000000001/pass1234 (both existed).",
+  "seed_data_creation": "Test contests were TEST_-prefixed and cleaned up. Left DB with 1 existing open contest ('Sample Open Contest' seed already present).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Only remaining gap is the 1-line frontend condition on My Entries tab to also render play-link for won status. After fix, re-run test_contest_link.py backend tests (they already pass) and re-verify My Entries tab shows Open contest button after admin declare-winner.",
+  "rca of the issue": "Root cause is in /app/frontend/src/pages/UserApp.jsx line ~151. The My Entries tab conditionally renders <a data-testid=`play-link-${e.id}`> only when `e.status === 'approved' && e.external_link`. When admin declares a winner the entry transitions to `won` (with external_link still attached by the backend) but the UI condition excludes 'won', so the button disappears. Fix: include 'won' in the status check."
+}
