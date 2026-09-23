@@ -35,7 +35,8 @@
 - [x] Testing agent iteration_1: all backend + frontend tests passed
 - [x] Contest editing (admin PATCH via dialog), search boxes in Users & Payments, user wallet history (GET /api/wallet/history), winners board (GET /api/winners) — iteration_2 all passed
 
+- [x] Match time on contests (admin datetime input, live countdown on cards, entries blocked after match start) + WhatsApp share button on cards — iteration_3 all passed
+
 ## Backlog
 - P2: Notifications (SMS/WhatsApp) on approval / winner
 - P2: Admin dashboard revenue chart
-- P2: Contest match_time countdown on cards
