@@ -8,7 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
-import { Baseball as CricketBall, SignOut, Wallet, Trophy, Ticket, Clock, ArrowSquareOut, UploadSimple, CurrencyInr } from "@phosphor-icons/react";
+import { Baseball as CricketBall, SignOut, Wallet, Trophy, Ticket, Clock, ArrowSquareOut, UploadSimple, CurrencyInr, Copy, DeviceMobile } from "@phosphor-icons/react";
+import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
 const StatusBadge = ({ status }) => {
@@ -197,7 +198,7 @@ export default function UserApp() {
         </Tabs>
       </main>
 
-      <JoinDialog contest={joinContest} onClose={() => setJoinContest(null)} adminUpi={config.admin_upi_id} onDone={loadAll} />
+      <JoinDialog contest={joinContest} onClose={() => setJoinContest(null)} config={config} onDone={loadAll} />
       <WithdrawDialog open={wdOpen} onClose={() => setWdOpen(false)} balance={user?.wallet_balance || 0} onDone={loadAll} />
     </div>
   );
@@ -243,7 +244,7 @@ function ContestCard({ contest, onJoin }) {
   );
 }
 
-function JoinDialog({ contest, onClose, adminUpi, onDone }) {
+function JoinDialog({ contest, onClose, config, onDone }) {
   const [utr, setUtr] = useState("");
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -251,6 +252,9 @@ function JoinDialog({ contest, onClose, adminUpi, onDone }) {
   useEffect(() => { setUtr(""); setFile(null); }, [contest]);
 
   if (!contest) return null;
+
+  const upiLink = `upi://pay?pa=${encodeURIComponent(config.admin_upi_id || "")}&pn=${encodeURIComponent(config.payee_name || "Admin")}&am=${contest.entry_fee}&cu=INR&tn=${encodeURIComponent(contest.title)}`;
+  const copyUpi = () => { navigator.clipboard?.writeText(config.admin_upi_id || ""); toast.success("UPI ID copied"); };
 
   const submit = async () => {
     if (!file) { toast.error("Upload payment screenshot"); return; }
@@ -278,13 +282,23 @@ function JoinDialog({ contest, onClose, adminUpi, onDone }) {
           <DialogTitle className="font-heading text-2xl font-extrabold tracking-tight">Join {contest.title}</DialogTitle>
           <DialogDescription>Pay <span className="font-bold text-emerald-700 tabular">{money(contest.entry_fee)}</span> to the admin UPI below, then upload the payment screenshot.</DialogDescription>
         </DialogHeader>
-        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
-          <div className="text-xs font-bold uppercase tracking-widest text-emerald-800">Admin UPI ID</div>
-          <div className="font-heading text-2xl font-extrabold text-emerald-900 tabular mt-1 select-all" data-testid="admin-upi-display">
-            {adminUpi || "—"}
+        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex gap-4 items-center">
+          <div className="bg-white p-2 rounded-md border border-emerald-200 shrink-0">
+            <QRCodeSVG value={upiLink} size={110} data-testid="upi-qr" />
           </div>
-          <div className="text-xs text-emerald-800 mt-2">Pay exactly {money(contest.entry_fee)} · Screenshot must show success.</div>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs font-bold uppercase tracking-widest text-emerald-800">Pay to UPI ID</div>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="font-heading text-xl font-extrabold text-emerald-900 tabular truncate select-all" data-testid="admin-upi-display">{config.admin_upi_id || "—"}</div>
+              <button type="button" onClick={copyUpi} className="p-1.5 rounded hover:bg-emerald-100 text-emerald-800" title="Copy" data-testid="copy-upi-btn"><Copy size={16} weight="bold" /></button>
+            </div>
+            {config.payee_name && <div className="text-xs text-emerald-800">{config.payee_name}</div>}
+            <a href={upiLink} className="mt-2 inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-md" data-testid="pay-upi-link">
+              <DeviceMobile size={14} weight="bold" /> Pay {money(contest.entry_fee)} in UPI app
+            </a>
+          </div>
         </div>
+        {config.instructions && <p className="text-xs text-zinc-600 bg-zinc-50 border border-zinc-200 rounded p-2" data-testid="payment-instructions">{config.instructions}</p>}
         <div className="space-y-3">
           <div>
             <Label className="text-xs font-bold uppercase tracking-widest text-zinc-500">UTR / Ref no. (optional)</Label>

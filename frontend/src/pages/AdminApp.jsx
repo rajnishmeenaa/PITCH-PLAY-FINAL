@@ -8,7 +8,8 @@ import { Label } from "../components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Baseball as CricketBall, SignOut, Users, Ticket, Receipt, CurrencyInr, Plus, Trash, Check, X, Trophy, Eye, ChartBar } from "@phosphor-icons/react";
+import { Baseball as CricketBall, SignOut, Users, Ticket, Receipt, CurrencyInr, Plus, Trash, Check, X, Trophy, Eye, ChartBar, Gear } from "@phosphor-icons/react";
+import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
 const money = (n) => `₹${Number(n || 0).toLocaleString("en-IN")}`;
@@ -35,6 +36,7 @@ const sections = [
   { key: "entries", label: "Payments", icon: Receipt },
   { key: "withdrawals", label: "Withdrawals", icon: CurrencyInr },
   { key: "users", label: "Users", icon: Users },
+  { key: "payment", label: "Payment settings", icon: Gear },
 ];
 
 export default function AdminApp() {
@@ -84,6 +86,7 @@ export default function AdminApp() {
         {active === "entries" && <EntriesPanel />}
         {active === "withdrawals" && <WithdrawalsPanel />}
         {active === "users" && <UsersPanel />}
+        {active === "payment" && <PaymentSettingsPanel />}
       </main>
     </div>
   );
@@ -422,11 +425,32 @@ function WithdrawalsPanel() {
 
 function UsersPanel() {
   const [users, setUsers] = useState([]);
-  useEffect(() => { api.get("/admin/users").then(r => setUsers(r.data)); }, []);
+  const [addOpen, setAddOpen] = useState(false);
+  const [walletFor, setWalletFor] = useState(null);
+  const load = () => api.get("/admin/users").then(r => setUsers(r.data));
+  useEffect(() => { load(); }, []);
+
+  const del = async (u) => {
+    if (!window.confirm(`Remove "${u.name}" (${u.mobile})? All their entries & withdrawals will be deleted.`)) return;
+    try { await api.delete(`/admin/users/${u.id}`); toast.success("User removed"); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  const block = async (u) => {
+    try { await api.post(`/admin/users/${u.id}/block`, { blocked: !u.blocked }); toast.success(u.blocked ? "Unblocked" : "Blocked"); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+
   return (
     <div>
-      <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-zinc-950">Users</h1>
-      <p className="text-zinc-500 mt-1">Mobile numbers are visible only to you (admin).</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-zinc-950">Users</h1>
+          <p className="text-zinc-500 mt-1">Mobile numbers are visible only to you (admin). Add, block or remove users.</p>
+        </div>
+        <Button onClick={() => setAddOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 font-bold rounded-md" data-testid="add-user-btn">
+          <Plus size={16} weight="bold" className="mr-1" /> Add user
+        </Button>
+      </div>
       <div className="bg-white border border-zinc-200 rounded-lg mt-6 overflow-hidden">
         <Table>
           <TableHeader>
@@ -437,23 +461,122 @@ function UsersPanel() {
               <TableHead className="font-bold">Wallet</TableHead>
               <TableHead className="font-bold">Total won</TableHead>
               <TableHead className="font-bold">Joined</TableHead>
+              <TableHead className="font-bold text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-10 text-zinc-500">No users yet</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-10 text-zinc-500">No users yet</TableCell></TableRow>
             ) : users.map((u) => (
-              <TableRow key={u.id} data-testid={`admin-user-row-${u.id}`}>
-                <TableCell className="font-bold text-zinc-950">{u.name}</TableCell>
+              <TableRow key={u.id} className={u.blocked ? "opacity-60" : ""} data-testid={`admin-user-row-${u.id}`}>
+                <TableCell className="font-bold text-zinc-950">
+                  {u.name}
+                  {u.blocked && <span className="ml-2 text-[10px] font-bold uppercase bg-red-100 text-red-700 px-1.5 py-0.5 rounded" data-testid={`blocked-badge-${u.id}`}>blocked</span>}
+                </TableCell>
                 <TableCell className="tabular font-mono">{u.mobile}</TableCell>
                 <TableCell className="tabular">{u.entries_count}</TableCell>
                 <TableCell className="tabular font-bold text-emerald-700">{money(u.wallet_balance)}</TableCell>
                 <TableCell className="tabular font-bold text-orange-700">{money(u.total_won)}</TableCell>
                 <TableCell className="text-xs text-zinc-500">{new Date(u.created_at).toLocaleDateString()}</TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center gap-2 justify-end">
+                    <Button size="sm" variant="outline" onClick={() => setWalletFor(u)} data-testid={`wallet-user-${u.id}`}><CurrencyInr size={14} className="mr-1" />Wallet</Button>
+                    <Button size="sm" variant="outline" onClick={() => block(u)} data-testid={`block-user-${u.id}`}>{u.blocked ? "Unblock" : "Block"}</Button>
+                    <Button size="sm" variant="ghost" className="text-red-600" onClick={() => del(u)} data-testid={`delete-user-${u.id}`}><Trash size={16} /></Button>
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
+      </div>
+      <AddUserDialog open={addOpen} onClose={() => setAddOpen(false)} onDone={load} />
+      <WalletDialog user={walletFor} onClose={() => setWalletFor(null)} onDone={load} />
+    </div>
+  );
+}
+
+function AddUserDialog({ open, onClose, onDone }) {
+  const [form, setForm] = useState({ name: "", mobile: "", password: "", wallet_balance: "0" });
+  const submit = async () => {
+    try {
+      await api.post("/admin/users", { ...form, wallet_balance: parseFloat(form.wallet_balance || "0") });
+      toast.success("User added");
+      setForm({ name: "", mobile: "", password: "", wallet_balance: "0" });
+      onClose(); onDone();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm" data-testid="add-user-dialog">
+        <DialogHeader><DialogTitle className="font-heading font-extrabold">Add user</DialogTitle></DialogHeader>
+        <div className="grid gap-3">
+          <Field label="Name"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="add-user-name" /></Field>
+          <Field label="Mobile"><Input inputMode="numeric" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} data-testid="add-user-mobile" /></Field>
+          <Field label="Password"><Input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} data-testid="add-user-password" /></Field>
+          <Field label="Opening wallet (₹)"><Input inputMode="decimal" value={form.wallet_balance} onChange={(e) => setForm({ ...form, wallet_balance: e.target.value })} data-testid="add-user-wallet" /></Field>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={submit} className="bg-emerald-600 hover:bg-emerald-700 font-bold" data-testid="add-user-submit">Add</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function WalletDialog({ user, onClose, onDone }) {
+  const [amt, setAmt] = useState("");
+  const [note, setNote] = useState("");
+  const adjust = async (sign) => {
+    const n = parseFloat(amt);
+    if (!n || n <= 0) { toast.error("Enter amount"); return; }
+    try {
+      await api.post(`/admin/users/${user.id}/wallet`, { amount: sign * n, note });
+      toast.success(sign > 0 ? "Wallet credited" : "Wallet debited");
+      setAmt(""); setNote(""); onClose(); onDone();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  return (
+    <Dialog open={!!user} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="max-w-sm" data-testid="wallet-dialog">
+        <DialogHeader><DialogTitle className="font-heading font-extrabold">Adjust wallet</DialogTitle></DialogHeader>
+        <p className="text-sm text-zinc-600"><b>{user?.name}</b> · current balance <b className="text-emerald-700 tabular">{money(user?.wallet_balance)}</b></p>
+        <Field label="Amount (₹)"><Input inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} data-testid="wallet-amount" /></Field>
+        <Field label="Note (optional)"><Input value={note} onChange={(e) => setNote(e.target.value)} data-testid="wallet-note" /></Field>
+        <DialogFooter>
+          <Button variant="destructive" onClick={() => adjust(-1)} data-testid="wallet-debit">Debit</Button>
+          <Button onClick={() => adjust(1)} className="bg-emerald-600 hover:bg-emerald-700 font-bold" data-testid="wallet-credit">Credit</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function PaymentSettingsPanel() {
+  const [form, setForm] = useState({ upi_id: "", payee_name: "", instructions: "" });
+  useEffect(() => { api.get("/admin/payment-settings").then(r => setForm({ upi_id: r.data.upi_id || "", payee_name: r.data.payee_name || "", instructions: r.data.instructions || "" })); }, []);
+  const save = async () => {
+    try { await api.put("/admin/payment-settings", form); toast.success("Payment settings saved"); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
+  };
+  const upiLink = `upi://pay?pa=${encodeURIComponent(form.upi_id)}&pn=${encodeURIComponent(form.payee_name || "Admin")}&cu=INR`;
+  return (
+    <div>
+      <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-zinc-950">Payment settings</h1>
+      <p className="text-zinc-500 mt-1">Users pay entry fees to this UPI ID. A QR code is generated automatically.</p>
+      <div className="grid lg:grid-cols-2 gap-6 mt-6">
+        <div className="bg-white border border-zinc-200 rounded-lg p-6 grid gap-4">
+          <Field label="UPI ID"><Input value={form.upi_id} onChange={(e) => setForm({ ...form, upi_id: e.target.value })} placeholder="yourname@upi" data-testid="settings-upi-input" /></Field>
+          <Field label="Payee name"><Input value={form.payee_name} onChange={(e) => setForm({ ...form, payee_name: e.target.value })} data-testid="settings-payee-input" /></Field>
+          <Field label="Instructions for users"><Textarea rows={3} value={form.instructions} onChange={(e) => setForm({ ...form, instructions: e.target.value })} placeholder="e.g. Add your mobile number in payment remark" data-testid="settings-instructions-input" /></Field>
+          <Button onClick={save} className="bg-emerald-600 hover:bg-emerald-700 font-bold w-fit" data-testid="settings-save-btn">Save settings</Button>
+        </div>
+        <div className="bg-white border border-zinc-200 rounded-lg p-6 flex flex-col items-center justify-center gap-3">
+          <div className="text-xs font-bold uppercase tracking-widest text-zinc-500">QR preview</div>
+          {form.upi_id ? <QRCodeSVG value={upiLink} size={180} data-testid="settings-qr" /> : <div className="text-sm text-zinc-400">Enter UPI ID</div>}
+          <div className="font-heading font-extrabold text-emerald-800 tabular" data-testid="settings-upi-preview">{form.upi_id || "—"}</div>
+        </div>
       </div>
     </div>
   );

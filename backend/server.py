@@ -110,6 +110,8 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
     user = await db.users.find_one({"id": payload["sub"]}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
+    if user.get("blocked"):
+        raise HTTPException(status_code=403, detail="Account blocked")
     return user
 
 
@@ -179,6 +181,35 @@ class ApproveBody(BaseModel):
     note: Optional[str] = None
 
 
+class AdminUserCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=60)
+    mobile: str = Field(min_length=6, max_length=15)
+    password: str = Field(min_length=4, max_length=100)
+    wallet_balance: float = 0.0
+
+
+class WalletAdjustBody(BaseModel):
+    amount: float  # positive = credit, negative = debit
+    note: Optional[str] = None
+
+
+class BlockBody(BaseModel):
+    blocked: bool
+
+
+class PaymentSettingsBody(BaseModel):
+    upi_id: str = Field(min_length=3, max_length=100)
+    payee_name: str = Field(default="", max_length=60)
+    instructions: str = Field(default="", max_length=500)
+
+
+async def get_payment_settings() -> dict:
+    s = await db.settings.find_one({"key": "payment"}, {"_id": 0})
+    if not s:
+        s = {"key": "payment", "upi_id": ADMIN_UPI_ID, "payee_name": "Admin", "instructions": ""}
+    return s
+
+
 # ---------- Auth ----------
 @api_router.post("/auth/signup")
 async def signup(body: SignupBody):
@@ -207,6 +238,8 @@ async def login(body: LoginBody):
     user = await db.users.find_one({"mobile": mobile}, {"_id": 0})
     if not user or not verify_password(body.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid mobile or password")
+    if user.get("blocked"):
+        raise HTTPException(status_code=403, detail="Your account is blocked. Contact admin.")
     token = create_token(user["id"], user["role"])
     return {
         "token": token,
@@ -407,7 +440,21 @@ async def declare_winner(entry_id: str, body: DeclareWinnerBody, admin=Depends(r
 # ---------- Wallet & Withdrawals ----------
 @api_router.get("/wallet/config")
 async def wallet_config(user=Depends(get_current_user)):
-    return {"admin_upi_id": ADMIN_UPI_ID}
+    s = await get_payment_settings()
+    return {"admin_upi_id": s["upi_id"], "payee_name": s.get("payee_name", ""), "instructions": s.get("instructions", "")}
+
+
+@api_router.get("/admin/payment-settings")
+async def admin_get_payment_settings(admin=Depends(require_admin)):
+    return await get_payment_settings()
+
+
+@api_router.put("/admin/payment-settings")
+async def admin_put_payment_settings(body: PaymentSettingsBody, admin=Depends(require_admin)):
+    doc = {"key": "payment", "upi_id": body.upi_id.strip(), "payee_name": body.payee_name.strip(),
+           "instructions": body.instructions.strip(), "updated_at": now_iso()}
+    await db.settings.update_one({"key": "payment"}, {"$set": doc}, upsert=True)
+    return doc
 
 
 @api_router.post("/withdrawals")
@@ -484,6 +531,65 @@ async def admin_users(admin=Depends(require_admin)):
         async for e in cur:
             u["total_won"] += e.get("winner_prize", 0)
     return users
+
+
+@api_router.post("/admin/users")
+async def admin_create_user(body: AdminUserCreate, admin=Depends(require_admin)):
+    mobile = body.mobile.strip()
+    if await db.users.find_one({"mobile": mobile}):
+        raise HTTPException(status_code=400, detail="Mobile already registered")
+    doc = {
+        "id": str(uuid.uuid4()),
+        "name": body.name.strip(),
+        "mobile": mobile,
+        "password_hash": hash_password(body.password),
+        "role": "user",
+        "wallet_balance": float(body.wallet_balance),
+        "blocked": False,
+        "created_by_admin": True,
+        "created_at": now_iso(),
+    }
+    await db.users.insert_one(doc)
+    doc.pop("_id", None)
+    doc.pop("password_hash", None)
+    return doc
+
+
+@api_router.delete("/admin/users/{user_id}")
+async def admin_delete_user(user_id: str, admin=Depends(require_admin)):
+    u = await db.users.find_one({"id": user_id, "role": "user"})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.users.delete_one({"id": user_id})
+    await db.entries.delete_many({"user_id": user_id})
+    await db.withdrawals.delete_many({"user_id": user_id})
+    return {"ok": True}
+
+
+@api_router.post("/admin/users/{user_id}/block")
+async def admin_block_user(user_id: str, body: BlockBody, admin=Depends(require_admin)):
+    res = await db.users.update_one({"id": user_id, "role": "user"}, {"$set": {"blocked": body.blocked}})
+    if res.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"ok": True, "blocked": body.blocked}
+
+
+@api_router.post("/admin/users/{user_id}/wallet")
+async def admin_adjust_wallet(user_id: str, body: WalletAdjustBody, admin=Depends(require_admin)):
+    u = await db.users.find_one({"id": user_id, "role": "user"}, {"_id": 0})
+    if not u:
+        raise HTTPException(status_code=404, detail="User not found")
+    if body.amount == 0:
+        raise HTTPException(status_code=400, detail="Amount cannot be zero")
+    new_balance = u.get("wallet_balance", 0.0) + body.amount
+    if new_balance < 0:
+        raise HTTPException(status_code=400, detail="Balance cannot go negative")
+    await db.users.update_one({"id": user_id}, {"$set": {"wallet_balance": new_balance}})
+    await db.wallet_logs.insert_one({
+        "id": str(uuid.uuid4()), "user_id": user_id, "amount": body.amount,
+        "note": body.note or "", "by": admin["id"], "created_at": now_iso(),
+    })
+    return {"ok": True, "wallet_balance": new_balance}
 
 
 @api_router.get("/admin/stats")
