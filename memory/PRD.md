@@ -33,9 +33,9 @@
 - [x] Admin user management: add, remove (cascade), block/unblock, wallet credit/debit
 - [x] Payment settings: admin-editable UPI ID / payee / instructions; user join dialog shows QR, copy UPI, `upi://pay` deep link with amount, instructions
 - [x] Testing agent iteration_1: all backend + frontend tests passed
+- [x] Contest editing (admin PATCH via dialog), search boxes in Users & Payments, user wallet history (GET /api/wallet/history), winners board (GET /api/winners) — iteration_2 all passed
 
 ## Backlog
-- P1: Search/filter in admin tables; contest edit dialog
-- P1: Wallet transaction history for users (wallet_logs exposure)
 - P2: Notifications (SMS/WhatsApp) on approval / winner
 - P2: Admin dashboard revenue chart
+- P2: Contest match_time countdown on cards
