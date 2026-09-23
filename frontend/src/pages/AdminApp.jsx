@@ -8,7 +8,7 @@ import { Label } from "../components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { toast } from "sonner";
-import { Baseball as CricketBall, SignOut, Users, Ticket, Receipt, CurrencyInr, Plus, Trash, Check, X, Trophy, Eye, ChartBar, Gear } from "@phosphor-icons/react";
+import { Baseball as CricketBall, SignOut, Users, Ticket, Receipt, CurrencyInr, Plus, Trash, Check, X, Trophy, Eye, ChartBar, Gear, PencilSimple, MagnifyingGlass } from "@phosphor-icons/react";
 import { QRCodeSVG } from "qrcode.react";
 import { useNavigate } from "react-router-dom";
 
@@ -123,25 +123,34 @@ function StatsPanel() {
 function ContestsPanel() {
   const [contests, setContests] = useState([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", external_link: "", entry_fee: "", prize_pool: "", max_participants: "100", match_time: "" });
+  const [editing, setEditing] = useState(null);
+  const blank = { title: "", description: "", external_link: "", entry_fee: "", prize_pool: "", max_participants: "100", match_time: "" };
+  const [form, setForm] = useState(blank);
 
   const load = () => api.get("/contests").then(r => setContests(r.data));
   useEffect(() => { load(); }, []);
 
+  const openEdit = (c) => {
+    setEditing(c);
+    setForm({ title: c.title, description: c.description || "", external_link: c.external_link || "", entry_fee: String(c.entry_fee), prize_pool: String(c.prize_pool), max_participants: String(c.max_participants), match_time: c.match_time || "" });
+    setOpen(true);
+  };
+
   const create = async () => {
+    const payload = {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      external_link: form.external_link.trim(),
+      entry_fee: parseFloat(form.entry_fee || "0"),
+      prize_pool: parseFloat(form.prize_pool || "0"),
+      max_participants: parseInt(form.max_participants || "100"),
+      match_time: form.match_time || null,
+    };
     try {
-      await api.post("/contests", {
-        title: form.title.trim(),
-        description: form.description.trim(),
-        external_link: form.external_link.trim(),
-        entry_fee: parseFloat(form.entry_fee || "0"),
-        prize_pool: parseFloat(form.prize_pool || "0"),
-        max_participants: parseInt(form.max_participants || "100"),
-        match_time: form.match_time || null,
-      });
-      toast.success("Contest created");
-      setOpen(false);
-      setForm({ title: "", description: "", external_link: "", entry_fee: "", prize_pool: "", max_participants: "100", match_time: "" });
+      if (editing) { await api.patch(`/contests/${editing.id}`, payload); toast.success("Contest updated"); }
+      else { await api.post("/contests", payload); toast.success("Contest created"); }
+      setOpen(false); setEditing(null);
+      setForm(blank);
       load();
     } catch (e) { toast.error(e?.response?.data?.detail || "Failed"); }
   };
@@ -166,7 +175,7 @@ function ContestsPanel() {
           <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-zinc-950">Contests</h1>
           <p className="text-zinc-500 mt-1">Create contests with any external play link.</p>
         </div>
-        <Button onClick={() => setOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 font-bold rounded-md" data-testid="new-contest-btn">
+        <Button onClick={() => { setEditing(null); setForm(blank); setOpen(true); }} className="bg-emerald-600 hover:bg-emerald-700 font-bold rounded-md" data-testid="new-contest-btn">
           <Plus size={16} weight="bold" className="mr-1" /> New contest
         </Button>
       </div>
@@ -196,6 +205,7 @@ function ContestsPanel() {
                 <TableCell><StatusBadge status={c.status} /></TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center gap-2 justify-end">
+                    <Button size="sm" variant="outline" onClick={() => openEdit(c)} data-testid={`edit-contest-${c.id}`}><PencilSimple size={14} /></Button>
                     {c.status === "open" ? (
                       <Button size="sm" variant="outline" onClick={() => toggle(c, "closed")} data-testid={`close-contest-${c.id}`}>Close</Button>
                     ) : (
@@ -214,7 +224,7 @@ function ContestsPanel() {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg" data-testid="new-contest-dialog">
-          <DialogHeader><DialogTitle className="font-heading font-extrabold">Create contest</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="font-heading font-extrabold">{editing ? "Edit contest" : "Create contest"}</DialogTitle></DialogHeader>
           <div className="grid gap-3">
             <Field label="Title"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} data-testid="contest-title-input" /></Field>
             <Field label="External play link"><Input value={form.external_link} onChange={(e) => setForm({ ...form, external_link: e.target.value })} placeholder="https://..." data-testid="contest-link-input" /></Field>
@@ -227,7 +237,7 @@ function ContestsPanel() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={create} className="bg-emerald-600 hover:bg-emerald-700 font-bold" data-testid="create-contest-submit">Create</Button>
+            <Button onClick={create} className="bg-emerald-600 hover:bg-emerald-700 font-bold" data-testid="create-contest-submit">{editing ? "Save changes" : "Create"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -244,11 +254,22 @@ function Field({ label, children }) {
   );
 }
 
+function SearchBox({ value, onChange, placeholder, testId }) {
+  return (
+    <div className="relative mt-5 max-w-sm">
+      <MagnifyingGlass size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+      <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className="pl-9 bg-white" data-testid={testId} />
+    </div>
+  );
+}
+
 function EntriesPanel() {
   const [entries, setEntries] = useState([]);
   const [preview, setPreview] = useState(null);
   const [winnerFor, setWinnerFor] = useState(null);
   const [prize, setPrize] = useState("");
+  const [q, setQ] = useState("");
+  const shown = entries.filter(e => !q || [e.user_name, e.user_mobile, e.contest_title, e.utr].some(v => (v || "").toLowerCase().includes(q.toLowerCase())));
 
   const load = () => api.get("/entries").then(r => setEntries(r.data));
   useEffect(() => { load(); }, []);
@@ -276,8 +297,9 @@ function EntriesPanel() {
     <div>
       <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-zinc-950">Payment approvals</h1>
       <p className="text-zinc-500 mt-1">Review UPI screenshots, approve to unlock the play link, declare winners.</p>
+      <SearchBox value={q} onChange={setQ} placeholder="Search mobile, name, contest, UTR..." testId="entries-search" />
 
-      <div className="bg-white border border-zinc-200 rounded-lg mt-6 overflow-hidden">
+      <div className="bg-white border border-zinc-200 rounded-lg mt-4 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50">
@@ -289,9 +311,9 @@ function EntriesPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {entries.length === 0 ? (
-              <TableRow><TableCell colSpan={5} className="text-center py-10 text-zinc-500">No entries yet</TableCell></TableRow>
-            ) : entries.map((e) => (
+            {shown.length === 0 ? (
+              <TableRow><TableCell colSpan={5} className="text-center py-10 text-zinc-500">No entries found</TableCell></TableRow>
+            ) : shown.map((e) => (
               <TableRow key={e.id} data-testid={`admin-entry-row-${e.id}`}>
                 <TableCell>
                   <div className="font-bold text-zinc-950">{e.user_name}</div>
@@ -427,6 +449,8 @@ function UsersPanel() {
   const [users, setUsers] = useState([]);
   const [addOpen, setAddOpen] = useState(false);
   const [walletFor, setWalletFor] = useState(null);
+  const [q, setQ] = useState("");
+  const shown = users.filter(u => !q || [u.name, u.mobile].some(v => (v || "").toLowerCase().includes(q.toLowerCase())));
   const load = () => api.get("/admin/users").then(r => setUsers(r.data));
   useEffect(() => { load(); }, []);
 
@@ -451,7 +475,8 @@ function UsersPanel() {
           <Plus size={16} weight="bold" className="mr-1" /> Add user
         </Button>
       </div>
-      <div className="bg-white border border-zinc-200 rounded-lg mt-6 overflow-hidden">
+      <SearchBox value={q} onChange={setQ} placeholder="Search by mobile or name..." testId="users-search" />
+      <div className="bg-white border border-zinc-200 rounded-lg mt-4 overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-zinc-50">
@@ -465,9 +490,9 @@ function UsersPanel() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10 text-zinc-500">No users yet</TableCell></TableRow>
-            ) : users.map((u) => (
+            {shown.length === 0 ? (
+              <TableRow><TableCell colSpan={7} className="text-center py-10 text-zinc-500">No users found</TableCell></TableRow>
+            ) : shown.map((u) => (
               <TableRow key={u.id} className={u.blocked ? "opacity-60" : ""} data-testid={`admin-user-row-${u.id}`}>
                 <TableCell className="font-bold text-zinc-950">
                   {u.name}

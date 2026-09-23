@@ -444,6 +444,25 @@ async def wallet_config(user=Depends(get_current_user)):
     return {"admin_upi_id": s["upi_id"], "payee_name": s.get("payee_name", ""), "instructions": s.get("instructions", "")}
 
 
+@api_router.get("/wallet/history")
+async def wallet_history(user=Depends(get_current_user)):
+    items = []
+    async for e in db.entries.find({"user_id": user["id"], "status": "won"}, {"_id": 0}):
+        items.append({"id": e["id"], "type": "prize", "amount": e.get("winner_prize", 0), "note": f"Won {e['contest_title']}", "created_at": e.get("won_at") or e["created_at"]})
+    async for w in db.withdrawals.find({"user_id": user["id"]}, {"_id": 0}):
+        items.append({"id": w["id"], "type": "payout", "amount": -w["amount"], "note": f"Withdrawal to {w['upi_id']} ({w['status']})", "created_at": w["created_at"]})
+    async for l in db.wallet_logs.find({"user_id": user["id"]}, {"_id": 0}):
+        items.append({"id": l["id"], "type": "credit" if l["amount"] > 0 else "debit", "amount": l["amount"], "note": l.get("note") or "Admin adjustment", "created_at": l["created_at"]})
+    items.sort(key=lambda x: x["created_at"], reverse=True)
+    return items
+
+
+@api_router.get("/winners")
+async def winners_board(user=Depends(get_current_user)):
+    items = await db.entries.find({"status": "won"}, {"_id": 0, "id": 1, "contest_title": 1, "user_name": 1, "winner_prize": 1, "won_at": 1}).sort("won_at", -1).to_list(100)
+    return items
+
+
 @api_router.get("/admin/payment-settings")
 async def admin_get_payment_settings(admin=Depends(require_admin)):
     return await get_payment_settings()

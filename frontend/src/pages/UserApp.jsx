@@ -38,24 +38,30 @@ export default function UserApp() {
   const [contests, setContests] = useState([]);
   const [entries, setEntries] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [winners, setWinners] = useState([]);
   const [config, setConfig] = useState({ admin_upi_id: "" });
   const [joinContest, setJoinContest] = useState(null);
   const [wdOpen, setWdOpen] = useState(false);
 
   const loadAll = async () => {
     try {
-      const [c, e, w, cfg, me] = await Promise.all([
+      const [c, e, w, cfg, me, h, win] = await Promise.all([
         api.get("/contests"),
         api.get("/entries/mine"),
         api.get("/withdrawals/mine"),
         api.get("/wallet/config"),
         api.get("/auth/me"),
+        api.get("/wallet/history"),
+        api.get("/winners"),
       ]);
       setContests(c.data);
       setEntries(e.data);
       setWithdrawals(w.data);
       setConfig(cfg.data);
       setUser(me.data);
+      setHistory(h.data);
+      setWinners(win.data);
     } catch (err) {
       toast.error("Failed to load data");
     }
@@ -112,6 +118,7 @@ export default function UserApp() {
           </TabsList>
 
           <TabsContent value="contests" className="mt-6">
+            <WinnersBoard winners={winners} />
             {contests.length === 0 ? (
               <EmptyState title="No contests yet" body="The admin hasn't dropped any contest. Check back soon." />
             ) : (
@@ -173,7 +180,9 @@ export default function UserApp() {
                   <CurrencyInr size={18} weight="bold" className="mr-1" /> Request withdrawal
                 </Button>
               </div>
-              <div className="md:col-span-2 bg-white border border-zinc-200 rounded-lg">
+              <div className="md:col-span-2 space-y-5">
+                <WalletHistory items={history} />
+                <div className="bg-white border border-zinc-200 rounded-lg">
                 <div className="p-5 border-b border-zinc-100">
                   <div className="font-heading font-bold text-zinc-950">Withdrawal history</div>
                 </div>
@@ -192,6 +201,7 @@ export default function UserApp() {
                     ))}
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </TabsContent>
@@ -369,6 +379,52 @@ function WithdrawDialog({ open, onClose, balance, onDone }) {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function WinnersBoard({ winners }) {
+  if (!winners.length) return null;
+  return (
+    <div className="mb-6 bg-zinc-950 text-white rounded-lg p-5 border border-zinc-800" data-testid="winners-board">
+      <div className="flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest">
+        <Trophy size={16} weight="fill" /> Recent winners
+      </div>
+      <div className="mt-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {winners.slice(0, 6).map((w) => (
+          <div key={w.id} className="bg-zinc-900 border border-zinc-800 rounded-md px-4 py-3 flex items-center justify-between" data-testid={`winner-${w.id}`}>
+            <div className="min-w-0">
+              <div className="font-heading font-bold truncate">{w.user_name}</div>
+              <div className="text-xs text-zinc-400 truncate">{w.contest_title}</div>
+            </div>
+            <div className="font-heading font-extrabold text-orange-400 tabular ml-3">{money(w.winner_prize)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WalletHistory({ items }) {
+  const color = { prize: "text-orange-700", credit: "text-emerald-700", debit: "text-red-600", payout: "text-red-600" };
+  return (
+    <div className="bg-white border border-zinc-200 rounded-lg" data-testid="wallet-history">
+      <div className="p-5 border-b border-zinc-100 font-heading font-bold text-zinc-950">Wallet history</div>
+      {items.length === 0 ? (
+        <div className="p-10 text-center text-zinc-500 text-sm">No transactions yet</div>
+      ) : (
+        <div className="divide-y divide-zinc-100">
+          {items.map((t) => (
+            <div key={t.id} className="px-5 py-3 flex items-center justify-between" data-testid={`wallet-tx-${t.id}`}>
+              <div>
+                <div className="text-sm font-semibold text-zinc-900">{t.note}</div>
+                <div className="text-xs text-zinc-500 uppercase tracking-wider">{t.type} · {new Date(t.created_at).toLocaleString()}</div>
+              </div>
+              <div className={`font-heading font-extrabold tabular ${color[t.type]}`}>{t.amount > 0 ? "+" : "−"}{money(Math.abs(t.amount))}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
