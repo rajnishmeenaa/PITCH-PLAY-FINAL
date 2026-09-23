@@ -1,0 +1,25 @@
+{
+  "summary": "Retest of iteration_4 fix: UserApp.jsx My Entries tab now renders play-link-{entryId} for both approved AND won entries. Seeded a fresh contest (TEST_RETEST_WON_LINK) with external_link=https://example.com/play/retest, joined as user 7000000001, approved and declared winner via admin. Verified via Playwright: My Entries row for the won entry renders `a[data-testid=play-link-{id}]` with href=https://example.com/play/retest and text 'Open contest'. Contests tab also renders card-play-link-{contestId} with same href. Fix is confirmed working.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "UserApp landing/dashboard", "issues": ["Minor React console warning: 'Cannot update a component (BrowserRouter) while rendering a different component (Landing)' - suggests a setState-in-render in Landing. Not blocking but should be addressed."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_contest_link.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "UserApp.jsx line 151 now correctly gates play-link on (status==='approved' || status==='won') && external_link. Backend attaches external_link only for those two statuses (server.py L398-400), so the double-gate is safe.",
+    "Consistent with ContestCard which unconditionally renders card-play-link when external_link is truthy - backend guarantees visibility rules.",
+    "Fix Landing component setState-in-render warning (see console)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100% (won-in-my-entries now shows)"},
+  "test_credentials": "Admin 9602341799/admin123; User 7000000001/pass1234.",
+  "seed_data_creation": "Created contest TEST_RETEST_WON_LINK (id 4735e01f-5744-43f9-ab0d-6bfa3ce65434) with external_link, entry 3a085166-8be6-472d-8d29-bf704de1230a (status=won). NOT cleaned up so main agent can re-verify visually; safe to delete.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iteration_4 bug is fully fixed. The seeded won entry (id 3a085166-...) and contest (4735e01f-...) can be reused or removed. Only remaining minor observation is a React setState-in-render console warning from the Landing component."
+}
